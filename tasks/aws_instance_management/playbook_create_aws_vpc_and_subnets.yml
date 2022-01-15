@@ -49,15 +49,7 @@
 
 - name: Set VPC ID as Fact
   ansible.builtin.set_fact:
-    key_value: "{{ vpcId }}: {{ myVpc.vpc.id }}"
-
-- name: what is myvpc.vpc.id?
-  debug:
-    msg: "{{ myVpc.vpc.id }}"
-
-- name: also print all varnames!
-  debug:
-    msg: "{{ lookup('varnames', '.*') }}"
+    "{{ vpcId }}": "{{ myVpc.vpc.id }}"
 
 - name: Write VPC name to local variables file
   vars:
@@ -71,17 +63,14 @@
 - name: Create Subnets
   amazon.aws.ec2_vpc_subnet:
     state: present
-    vpc_id: "{{ myVpc.vpc.id }}" # "{{ lookup('vars', vpcId) }}" #"{{ myVpc.vpc.id }}"
+    vpc_id: "{{ lookup('vars', vpcId) }}"
     cidr: "{{ item }}"
     region: us-east-1
   loop: "{{ subnets | dict2items(key_name='k') | community.general.json_query('[*].k') }}"
+  # loop: "{{ subnets }}"
   loop_control:
     index_var: idx
   register: subnetsCollection
-
-# - name: debug subnetsCollection
-#   debug:
-#     msg: "{{ subnetsCollection | json_query('results[*].item') }}"
 
 - name: Write subnet cidrs to local variables file
   vars:

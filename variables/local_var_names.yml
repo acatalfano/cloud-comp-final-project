@@ -4,5 +4,5 @@
 runningInstanceIds: running_aws_ids
 subnetCidrs: subnet_CIDRs
 vpc: subscriber_vpc
-vpcId: vpc_id
+vpcId: 'my_vpc_id'
 ...

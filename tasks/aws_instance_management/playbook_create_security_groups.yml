@@ -11,12 +11,6 @@
 #   vpcId - AWS VPC ID for EC2
 #   region - AWS region
 
-- name: debug shit
-  debug:
-    # msg: "{{ lookup('varnames', '.*') }}"
-    msg: "{{ lookup('vars', item) }}"
-  loop: "{{ lookup('varnames', '.*') | split(',') }}"
-
 - name: create a security group
   loop: "{{ security_groups }}"
   amazon.aws.ec2_group:

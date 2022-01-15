@@ -48,10 +48,27 @@
   loop: "{{ cidr_instance_ordinal_pairs }}"
   register: ec2InstancesCollection
 
+- name: Set IDs Fact
+  ansible.builtin.set_fact:
+    "{{ runningInstanceIds }}": "{{ ec2InstancesCollection.results | json_query('[*].instance_id') | list }}"
+
+- name: Pause for deployment
+  ansible.builtin.pause:
+    seconds: 30
+
+- name: Wait for SSH to come up
+  debugger: on_failed
+  delegate_to: "{{ item.public_dns_name }}"
+  ansible.builtin.wait_for:
+    timeout: 60
+    port: 22
+    state: started
+  loop: "{{ lookup('vars', runningInstanceIds) }}"
+
 - name: write EC2 instance IDs to local variables file
   vars:
     varname: "{{ runningInstanceIds }}"
-    varval: "{{ ec2InstancesCollection.results | json_query('[*].instance_id') | list | to_yaml }}"
+    varval: "{{ lookup('vars', runningInstanceIds) | to_yaml }}"
   ansible.builtin.include_tasks: ../playbook_write_local_vars_file.yml
 # - name: Provision master/vm2 instance
 #   vars:
