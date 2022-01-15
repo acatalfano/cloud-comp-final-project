@@ -1,0 +1,41 @@
+---
+#
+# EECS 5287: Principles of Cloud Computing
+# Author: Adam Catalfano, Abhinav Jambulingam
+# Created: Fall 2021
+#
+# Write the created instances to an inventory file, deleting it first if it exists
+#
+# REQUIRES: varname - name of variable
+#           varval  - value of variable
+#
+
+- name: Include Path Name Vars
+  ansible.builtin.include_vars: ../variables/path_names.yml
+
+- name: Include Group Name Vars
+  ansible.builtin.include_vars: ../variables/group_names.yml
+
+- name: Check if Local Vars File exists
+  ansible.builtin.stat:
+    path: "{{ localVmVariables }}"
+  register: localVarsStat
+
+- name: Create and write heading to file if not exist
+  ansible.builtin.lineinfile:
+    create: yes
+    line: '---'
+    path: "{{ localVmVariables }}"
+  when: not localVarsStat.stat.exists
+
+- name: Write variable data to file
+  ansible.builtin.lineinfile:
+    path: "{{ localVmVariables }}"
+    line: "{{ varname }}: {{ varval }}"
+
+# - name: Write EC2 ID's to Variables File as an array variable
+#   ansible.builtin.lineinfile:
+#     path: "{{ localVmVariables }}"
+#     line: "---\n{{ runningInstanceIds }}: {{ instance_ids }}\n..."
+#     create: yes
+...

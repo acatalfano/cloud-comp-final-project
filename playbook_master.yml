@@ -1,0 +1,84 @@
+#
+# EECS 5287: Principles of Cloud Computing
+# Author: Adam Catalfano, Abhinav Jambulingam
+# Created: Fall 2021
+#
+# This playbook spawns some EC2 instances
+# to subscribe to different topics
+# produced by a an SNS infrastructure
+#
+
+
+#############################################################################
+### Play 1: Terminate Any Existing Cloud Instances
+#
+# Run the cleanup master playbook to cleanup
+# any remote instances if they exist
+#############################################################################
+- name: 'Play 1: Terminate Any Existing Cloud Instances'
+  ansible.builtin.import_playbook: playbook_master_cleanup.yml
+  when: false
+
+#############################################################################
+### Play 2: Install/Configure Base Dependencies
+#
+# Install pip, configure python to point to python3,
+# Install python packages boto3, botocore, and docker
+#############################################################################
+- name: 'Play 2: Install/Configure Base Dependencies'
+  hosts: MyLocalVMs
+  tasks:
+  - name: Aptitude Upgrade
+    become: yes
+    ansible.builtin.apt:
+      upgrade: dist
+      update_cache: yes
+
+  - name: Configure Python Versions
+    ansible.builtin.include_tasks: tasks/playbook_configure_python.yml
+
+  # - name: Configure File Modes for SSH, etc.
+  #   ansible.builtin.include_tasks: tasks/playbook_configure_file_modes.yml
+
+  - name: Install boto, boto3, and botocore python packages
+    ansible.builtin.pip:
+      name:
+      - boto
+      - boto3
+      - botocore
+
+#############################################################################
+### Play 3: Create AWS EC2 Artifacts
+#
+# TODO: and AMI later to speed up deployment...
+# Create VPC, Security Groups, Subnets, AMI, and EC2 Instances on AWS
+#############################################################################
+- name: 'Play 3: Create AWS Artificts'
+  hosts: MyLocalVMs
+  strategy: debug
+  vars_files:
+  - variables/aws_vars.yml
+  - variables/local_var_names.yml
+
+  tasks:
+  - name: Build AWS EC2 VPC and Subnets
+    ansible.builtin.include_tasks: tasks/aws_instance_management/playbook_create_aws_vpc_and_subnets.yml
+
+  - name: Build AWS EC2 Security Groups
+    ansible.builtin.include_tasks: tasks/aws_instance_management/playbook_create_security_groups.yml
+
+  - name: Install dos2unix
+    become: yes
+    ansible.builtin.apt:
+      name: dos2unix
+
+  - name: Fix line endings on Inventory file
+    ansible.builtin.shell: dos2unix ~/Inventory
+
+  - name: Provision AWS EC2 instances
+    ansible.builtin.include_tasks: tasks/aws_instance_management/playbook_create_aws_vms.yml
+
+  - name: Seal the local VM vars file with ...
+    ansible.builtin.include_tasks: tasks/playbook_seal_local_vars_file.yml
+
+...

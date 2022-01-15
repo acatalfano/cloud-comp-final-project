@@ -1,0 +1,149 @@
+---
+#
+# EECS 5287: Principles of Cloud Computing
+# Author: Adam Catalfano, Abhinav Jambulingam
+# Created: Fall 2021
+#
+# Create EC2 instances on AWS
+#
+
+- name: Include Group Name variables
+  ansible.builtin.include_vars: ../../variables/group_names.yml
+
+- name: Include AWS variables
+  ansible.builtin.include_vars: ../../variables/aws_vars.yml
+
+# - name: Include config
+
+- name: Write subnet cidrs-to-ids mapping to ansible facts
+  loop: "{{ subnetsCollection | json_query('results[*].subnet.{ id: id, cidr: cidr_block }') }}"
+  ansible.builtin.set_fact:
+    subnet_cidrs_to_id: "{{ (subnet_cidrs_to_id | default({})) | combine({ (item.cidr): item.id }) }}"
+
+# - name: Get Subnets
+#   amazon.aws.ec2_vpc_subnet_info:
+#     filters:
+#       # vpc-id: "{{ ..... }}"
+
+  # TODO: this loop (plus range on arity...) will be used for ec2's
+  # loop: "{{ subnets | dict2items(key_name='cidr', value_name='arity') }}"
+
+- name: Recursively build list of cidr/instance-id pairs
+  loop: "{{ subnets | dict2items(key_name='cidr', value_name='arity') }}"
+  ansible.builtin.set_fact:
+    cidr_instance_ordinal_pairs: "{{ (cidr_instance_ordinal_pairs | default([])) + ([item.cidr] | product(range(item.arity))) }}"
+
+- name: Provision EC2 instances
+  amazon.aws.ec2_instance:
+    name: "{{ item | join('-') }}"
+    instance_type: t2.small
+    image_id: ami-09e67e426f25ce0d7
+    security_groups: "{{ security_groups | json_query('[*].name') }}"
+    key_name: "{{ key_name }}"
+    region: us-east-1
+    vpc_subnet_id: "{{ subnet_cidrs_to_id[item[0]] }}"
+    # network:
+    #   assign_public_ip: yes
+    state: running
+  loop: "{{ cidr_instance_ordinal_pairs }}"
+  register: ec2InstancesCollection
+
+- name: write EC2 instance IDs to local variables file
+  vars:
+    varname: "{{ runningInstanceIds }}"
+    varval: "{{ ec2InstancesCollection.results | json_query('[*].instance_id') | list | to_yaml }}"
+  ansible.builtin.include_tasks: ../playbook_write_local_vars_file.yml
+# - name: Provision master/vm2 instance
+#   vars:
+#     name: "{{  'master_vm2' + item }}"
+#     instanceFlavor: t2.small
+#     instanceFactName: master_instance
+#     secGroupList:
+#     - "{{ test_allSG.name }}"
+#   ansible.builtin.include_tasks: ./playbook_provision_aws_template.yml
+#   loop: "{{ range(5) }}"
+
+# - name: write AWS public IPs to Inventory
+#   ansible.builtin.replace:
+#     path: '~/Inventory'
+#     regexp: '(?<=^\[{{ item.lineBefore }}\]\n)(\d+\.){3}\d+'
+#     replace: '{{ item.publicIP }}'
+#   loop:
+#   - lineBefore: Remote1
+#     publicIP: "{{ master_instance.public_ip_address }}"
+#   - lineBefore: Remote2
+#     publicIP: "{{ regular_instance.public_ip_address }}"
+
+# - name: Refresh the updated Inventory File
+#   ansible.builtin.meta: refresh_inventory
+
+# # - name: Add new instances to all_remote and all_remote_and_producers group
+# #   ansible.builtin.add_host:
+# #     hostname: "{{ item.public_ip_address }}"
+# #     groups:
+# #     - "{{ allRemote }}"
+# #     - "{{ allRemoteAndProducers }}"
+# #   loop: [ "{{ master_instance }}", "{{ regular_instance }}" ]
+
+# - name: Add instances to appropriate vm2 and vm3 groups and to all_remote and all_remote_and_producers
+#   ansible.builtin.add_host:
+#     hostname: "{{ item.0.public_ip_address }}"
+#     groups:
+#     - "{{ item.1 }}"
+#     - "{{ allRemote }}"
+#     - "{{ allRemoteAndProducers }}"
+#   with_together:
+#   - [ "{{ master_instance }}", "{{ regular_instance }}" ]
+#   - [ "{{ kafka1ZookeeperConsumer }}", "{{ kafka2CouchDB }}" ]
+
+# - name: Add master to k8s_remote_and_producer_masters
+#   ansible.builtin.add_host:
+#     hostname: "{{ master_instance.public_ip_address }}"
+#     group: "{{ k8sRemoteAndProducerMasters }}"
+
+# # - name: Add producers to all_remote_and_producers group
+# #   ansible.builtin.add_host:
+# #     hostname: "{{ item }}"
+# #     ansible_connection: ssh
+# #     ansible_user: vagrant
+# #     ansible_ssh_private_key_file: "{{ producerPrivateKeyFile }}"
+# #     group: "{{ allRemoteAndProducers }}"
+# #   loop:
+# #   - producer1
+# #   - producer2
+
+# - name: set ips as facts
+#   ansible.builtin.set_fact:
+#     "{{ zookeeperIp }}": "{{ master_instance.public_ip_address }}"
+#     "{{ couchdbIp }}": "{{ regular_instance.public_ip_address }}"
+#     "{{ zookeeper_private_ip }}": "{{ master_instance.private_ip_address }}"
+#     "{{ couchdb_private_ip }}": "{{ regular_instance.private_ip_address }}"
+
+# - name: Pause for deployment
+#   ansible.builtin.pause:
+#     seconds: 30
+
+# - name: Wait for SSH to come up
+#   debugger: on_failed
+#   delegate_to: "{{ item.public_dns_name }}"
+#   ansible.builtin.wait_for:
+#     timeout: 60
+#     port: 22
+#     state: started
+#   loop: [ "{{ master_instance }}", "{{ regular_instance }}" ]
+
+# - name: Include Local Var Names
+#   ansible.builtin.include_vars: ../../variables/local_var_names.yml
+
+# - name: Set IDs Fact
+#   ansible.builtin.set_fact:
+#     key_value: "{{ runningInstanceIds }}: [ {{ master_instance }}, {{ regular_instance }} ]"
+
+
+# - name: Write EC2 IDs to local variables file
+#   vars:
+#     instance_ids:
+#     - "{{ master_instance.instance_id }}"
+#     - "{{ regular_instance.instance_id }}"
+#   ansible.builtin.include_tasks: ../playbook_write_local_vars_file.yml
+...

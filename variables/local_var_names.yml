@@ -1,0 +1,8 @@
+---
+# this is where we defined variable names
+# for what gets written to the local_vars.yml file
+runningInstanceIds: running_aws_ids
+subnetCidrs: subnet_CIDRs
+vpc: subscriber_vpc
+vpcId: vpc_id
+...

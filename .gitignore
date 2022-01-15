@@ -1,0 +1,15 @@
+__pycache__/
+.mypy_cache/
+credentials/
+file_srcs/containers/Deployment/
+file_srcs/containers/Job/
+file_srcs/containers/Service_Job/
+file_srcs/containers/README
+copied-from-remote/
+hosts_loop.j2
+playbook_test.yml
+.aws
+debug.out
+.git/backup_*
+.vagrant
+rsa_private.pem
