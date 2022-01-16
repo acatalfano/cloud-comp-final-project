@@ -1,7 +1,47 @@
 # N.B. there are NOOOO CHECKS IN PLACE currently!!!!
 #     make sure your mapping is to a number within the size of the subnet!
 #     and make sure the subnets you configure are within the containing subnet of 10.10.0.0/16
-subnets:
-  10.10.0.0/28: 3
-  10.10.1.0/28: 4
-  # 10.10.2.0/28: 6
+#     and no overlapping/identical subnets!
+subscriberSubnets:
+- cidr: 10.10.1.0/28
+  instances: 1
+  homogenous: false
+  topics: 3
+
+# - cidr: 10.10.0.0/28
+#   instances: 3
+#   homogenous: false
+#   topics: 2
+
+
+# - cidr: 10.10.1.0/28
+#   instances: 4
+#   homogenous: false
+#   topics: 1
+
+# - cidr: 10.10.2.0/28
+#   instances: 6
+#   homogenous: false
+#   topics: 2
+
+publisherSubnets:
+- cidr: 10.20.1.0/28
+  homogenous: false
+  instances: 2
+  topics: 2
+
+# - cidr: 10.20.2.0/28
+#   homogenous: false
+#   instances: 2
+#   topics: 2
+
+# - cidr: 10.20.3.0/28
+#   homogenous: false
+#   instances: 2
+#   topics: 2
+
+# - cidr: 10.20.4.0/28
+#   homogenous: false
+#   instances: 2
+#   topics: 2
+

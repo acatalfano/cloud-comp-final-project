@@ -17,7 +17,6 @@
 #############################################################################
 - name: 'Play 1: Terminate Any Existing Cloud Instances'
   ansible.builtin.import_playbook: playbook_master_cleanup.yml
-  when: false
 
 #############################################################################
 ### Play 2: Install/Configure Base Dependencies
@@ -47,6 +46,19 @@
       - boto3
       - botocore
 
+  - name: Change permissions for id_rsa
+    ansible.builtin.file:
+      path: ~/.ssh/id_rsa
+      mode: 0600
+
+  - name: Install dos2unix
+    become: yes
+    ansible.builtin.apt:
+      name: dos2unix
+
+  - name: Fix line endings on Inventory file
+    ansible.builtin.shell: dos2unix ~/Inventory
+
 #############################################################################
 ### Play 3: Create AWS EC2 Artifacts
 #
@@ -59,26 +71,137 @@
   vars_files:
   - variables/aws_vars.yml
   - variables/local_var_names.yml
+  - configs/subnets.yml
+  vars:
+    varsGroupsAndSubnets:
+    - varsGroup: "{{ subscribers }}"
+      subnets: "{{ subscriberSubnets }}"
+    - varsGroup: "{{ publishers }}"
+      subnets: "{{ publisherSubnets }}"
 
   tasks:
-  - name: Build AWS EC2 VPC and Subnets
-    ansible.builtin.include_tasks: tasks/aws_instance_management/playbook_create_aws_vpc_and_subnets.yml
+  - name: Build EC2 Artifacts for all VPC's
+    vars:
+      varsGroup: "{{ item.varsGroup }}"
+      vpcConfig: "{{ item.vpcConfig }}"
+      subnets: "{{ item.subnets }}"
+    ansible.builtin.include_tasks: tasks/aws_instance_management/playbook_create_artifacts.yml
+    loop:
+    - varsGroup: "{{ subscribers }}"
+      vpcConfig: "{{ vpcConfigs.subscriber }}"
+      subnets: "{{ subscriberSubnets }}"
+    - varsGroup: "{{ publishers }}"
+      vpcConfig: "{{ vpcConfigs.publisher }}"
+      subnets: "{{ publisherSubnets }}"
+  # - name: Build AWS EC2 VPC
+  #   vars:
+  #     varsGroup: "{{ vpcData.varsGroup }}"
+  #     vpcConfig: "{{  vpcData.vpcConfig }}"
+  #   ansible.builtin.include_tasks: tasks/aws_instance_management/playbook_create_aws_vpc.yml
+  #   loop:
+  #   - varsGroup: "{{ subscribers }}"
+  #     vpcConfig: "{{ vpcConfigs.subscriber }}"
+  #   - varsGroup: "{{ publishers }}"
+  #     vpcConfig: "{{ vpcConfigs.publisher }}"
+  #   loop_control:
+  #     loop_var: vpcData
 
-  - name: Build AWS EC2 Security Groups
-    ansible.builtin.include_tasks: tasks/aws_instance_management/playbook_create_security_groups.yml
+  # - name: pause between vpc and subnets
+  #   ansible.builtin.pause:
+  #     seconds: 15
 
-  - name: Install dos2unix
-    become: yes
-    ansible.builtin.apt:
-      name: dos2unix
+  # - name: Build AWS EC2 Subnets
+  #   vars:
+  #     varsGroup: "{{ subnetsData.varsGroup }}"
+  #     subnets: "{{ subnetsData.subnets }}"
+  #   ansible.builtin.include_tasks: tasks/aws_instance_management/playbook_create_subnets.yml
+  #   loop: "{{ varsGroupsAndSubnets }}"
+  #   loop_control:
+  #     loop_var: subnetsData
 
-  - name: Fix line endings on Inventory file
-    ansible.builtin.shell: dos2unix ~/Inventory
+  # - name: pause between subnets and security groups
+  #   ansible.builtin.pause:
+  #     seconds: 15
 
-  - name: Provision AWS EC2 instances
-    ansible.builtin.include_tasks: tasks/aws_instance_management/playbook_create_aws_vms.yml
+  # - name: Build AWS EC2 Security Groups
+  #   vars:
+  #     vpcId: "{{ subscribers.vpcId }}"
+  #   ansible.builtin.include_tasks: tasks/aws_instance_management/playbook_create_securityGroups.yml
 
+  # - name: Install dos2unix
+  #   become: yes
+  #   ansible.builtin.apt:
+  #     name: dos2unix
+
+  # - name: Fix line endings on Inventory file
+  #   ansible.builtin.shell: dos2unix ~/Inventory
+
+  # - name: Provision AWS EC2 instances
+  #   vars:
+  #     varsGroup: "{{ instanceData.varsGroup }}"
+  #     subnets: "{{ instanceData.subnets }}"
+  #   ansible.builtin.include_tasks: tasks/aws_instance_management/playbook_create_aws_vms.yml
+  #   # loop: "{{ varsGroupsAndSubnets }}"
+  #   loop:
+  #   # - varsGroup: "{{ subscribers }}"
+  #   #   subnets: "{{ subscriberSubnets }}"
+  #   - varsGroup: "{{ publishers }}"
+  #     subnets: "{{ publisherSubnets }}"
+  #   loop_control:
+  #     loop_var: instanceData
+
+  # TODO: provision all the publisher artifacts and move this next task to be after all of that
   - name: Seal the local VM vars file with ...
     ansible.builtin.include_tasks: tasks/playbook_seal_local_vars_file.yml
 
+#############################################################################
+### Play 4: Provision AWS EC2 Publisher
+#
+# Create AWS EC2 artifacts to constitute the Publisher backend
+#                                           that feeds intoSNS
+#############################################################################
+# - name: 'Play 4: Provision AWS EC2 Publisher'
+#   hosts: MyLocalVMa
+#   strategy: debug
+#   tasks:
+#   - name: Write VPC ID to local variables file
+#     vars:
+#       varname: "{{ vpcId }}"
+#       varval: "{{ myVpc.vpc.id }}"
+#     ansible.builtin.include_tasks: ../playbook_write_local_vars_file.yml
+
+#   - name: Set VPC ID as Fact
+#     ansible.builtin.set_fact:
+#       "{{ vpcId }}": "{{ myVpc.vpc.id }}"
+
+#   - name: Write VPC name to local variables file
+#     vars:
+#       varname: "{{ vpc }}"
+#       varval: my_vpc
+#     ansible.builtin.include_tasks: ../playbook_write_local_vars_file.yml
+
+#   - name: Import subnet config
+#     ansible.builtin.include_vars: ../../configs/subnets.yml
+
+#   - name: Create Subnets
+#     amazon.aws.ec2_vpc_subnet:
+#       state: present
+#       vpc_id: "{{ lookup('vars', vpcId) }}"
+#       cidr: "{{ item.cidr }}"
+#       region: us-east-1
+#     # loop: "{{ subnets | dict2items(key_name='k') | community.general.json_query('[*].k') }}"
+#     loop: "{{ subnets }}"
+#     loop_control:
+#       index_var: idx
+#     register: subnetsCollection
+
+#   - name: Write subnet cidrs to local variables file
+#     vars:
+#       varname: "{{ subnetCidrs }}"
+#       varval: "{{ subnetsCollection.results | json_query('[*].subnet.cidr_block') | list | to_yaml }}"
+#     ansible.builtin.include_tasks: ../playbook_write_local_vars_file.yml
+
+
+
+#   - name: do some shit
 ...

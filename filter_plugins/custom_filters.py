@@ -1,10 +1,19 @@
+from itertools import product
+from copy import deepcopy
+
+
 class FilterModule(object):
     def filters(self):
         return {
             'asSecGroupRules': self.filter_as_sec_group_rules,
-            'flagOptions': self.flag_options
+            'flagOptions': self.filter_flagOptions,
+            'subnetsConfigToDict': self.filter_subnetsConfigToDict,
+            'appendProperty': self.filter_appendProperty
         }
 
+    # -----------------------------------------------------------
+    # --------- asSecGroupRules ---------------------------------
+    # -----------------------------------------------------------
     def filter_as_sec_group_rules(self, rules_data):
         return [
             {
@@ -34,7 +43,10 @@ class FilterModule(object):
             port = int(port_range[port_range.find('-') + 1:])
         return port
 
-    def flag_options(self, options, option_flag):
+    # -----------------------------------------------------------
+    # --------- flagOptions -------------------------------------
+    # -----------------------------------------------------------
+    def filter_flagOptions(self, options, option_flag):
         '''
             Used for a CLI options list where a single option-flag
             is used multiple times on different arguments
@@ -46,3 +58,22 @@ class FilterModule(object):
             ]
             for item in pair
         ]
+
+    # -----------------------------------------------------------
+    # --------- subnetsConfigToDict -----------------------------
+    # -----------------------------------------------------------
+    def filter_subnetsConfigToDict(self, subnetsConfig):
+        return [
+            {'ordinal': ordinal,
+                'cidr': item['cidr'], 'topics': item['topics']}
+            for sn in subnetsConfig
+            for (ordinal, item) in product(range(sn['instances']), [sn])
+        ]
+
+    # -----------------------------------------------------------
+    # --------- appendProperty ----------------------------------
+    # -----------------------------------------------------------
+    def filter_appendProperty(self, data, prop, appendage):
+        data_copy = deepcopy(data)
+        data_copy[prop] = data_copy[prop] + appendage
+        return data_copy

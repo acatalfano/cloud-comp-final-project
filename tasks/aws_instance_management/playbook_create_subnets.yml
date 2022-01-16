@@ -1,0 +1,65 @@
+---
+#
+# EECS 5287: Principles of Cloud Computing
+# Author: Adam Catalfano, Abhinav Jambulingam
+# Created: Fall 2021
+#
+# Create Subnet on AWS, publicly exposed with Internet Gateway and Routing Table
+#
+# Requires:
+#     varsGroup -- dict with vpcId, subnetCidrs
+#     subnets -- list of dicts w/ cidr, instances
+#
+
+- name: Create Subnets
+  amazon.aws.ec2_vpc_subnet:
+    state: present
+    vpc_id: "{{ lookup('vars', varsGroup.vpcId) }}"
+    cidr: "{{ sn.cidr }}"
+    region: "{{ region }}"
+    map_public: yes
+  loop: "{{ subnets }}"
+  loop_control:
+    loop_var: sn
+  register: subnetsCollection
+
+- name: pause between subnets and internet gateway
+  ansible.builtin.pause:
+    seconds: 15
+
+- name: Write subnet cidrs to local variables file
+  vars:
+    varname: "{{ varsGroup.subnetCidrs }}"
+    varval: "{{ subnetsCollection.results | json_query('[*].subnet.cidr_block') | list | to_yaml }}"
+  ansible.builtin.include_tasks: ../playbook_write_local_vars_file.yml
+
+- name: debug vpcId value
+  debug:
+    msg: "{{ varsGroup.vpcId }}"
+
+- name: debug vpcId lookup
+  debug:
+    msg: "{{ lookup('vars', varsGroup.vpcId) }}"
+
+- name: nuclear pause to debug!
+  ansible.builtin.pause:
+    minutes: 5
+
+- name: Create Internet Gateway
+  amazon.aws.ec2_vpc_igw:
+    vpc_id: "{{ lookup('vars', varsGroup.vpcId) }}"
+  register: igw
+
+- name: pause between internet gateway and routing table
+  ansible.builtin.pause:
+    seconds: 15
+
+- name: Create Routing Table
+  amazon.aws.ec2_vpc_route_table:
+    vpc_id: "{{ lookup('vars', varsGroup.vpcId) }}"
+    region: "{{ region }}"
+    subnets: "{{ subnetsCollection.results | json_query('[*].subnet.cidr_block') }}"
+    routes:
+    - dest: 0.0.0.0/0
+      gateway_id: "{{ igw.gateway_id }}"
+...

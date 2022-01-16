@@ -28,29 +28,53 @@
   # TODO: this loop (plus range on arity...) will be used for ec2's
   # loop: "{{ subnets | dict2items(key_name='cidr', value_name='arity') }}"
 
-- name: Recursively build list of cidr/instance-id pairs
-  loop: "{{ subnets | dict2items(key_name='cidr', value_name='arity') }}"
-  ansible.builtin.set_fact:
-    cidr_instance_ordinal_pairs: "{{ (cidr_instance_ordinal_pairs | default([])) + ([item.cidr] | product(range(item.arity))) }}"
+# - name: Recursively build list of cidr/instance-id pairs
+#   # loop: "{{ subnets | dict2items(key_name='cidr', value_name='arity') }}"
+#   loop: "{{ subnets | subnetsConfigToDict }}"
+#   ansible.builtin.set_fact:
+#     cidr_instance_ordinal_pairs: "{{ (cidr_instance_ordinal_pairs | default([])) + ([item.cidr] | product(range(item.arity))) }}"
+
+- name: debug subnet_cidrs_to_id
+  debug: var=subnet_cidrs_to_id
+
+- name: debug subnets | subnetsConfigToDict
+  debug:
+    msg: "{{ subnets | subnetsConfigToDict }}"
+
+# - name: debug hostvars
+#   debug: var=hostvars
+
+# - name: debug all facts
+#   debug: var=ansible_facts
+
+- name: debug securityGroups
+  debug: var=securityGroups
 
 - name: Provision EC2 instances
   amazon.aws.ec2_instance:
-    name: "{{ item | join('-') }}"
+    name: "{{ subnetConfigData | json_query('*') | join('-') }}" #"{{ subnetConfigData | json_query('*[]') | list | join('-') }}"
     instance_type: t2.small
     image_id: ami-09e67e426f25ce0d7
-    security_groups: "{{ security_groups | json_query('[*].name') }}"
+    security_groups: "{{ securityGroups | json_query('[*].name') }}"
     key_name: "{{ key_name }}"
-    region: us-east-1
-    vpc_subnet_id: "{{ subnet_cidrs_to_id[item[0]] }}"
-    # network:
-    #   assign_public_ip: yes
+    region: "{{ region }}"
+    vpc_subnet_id: "{{ subnet_cidrs_to_id[subnetConfigData.cidr] }}" #"{{ subnet_cidrs_to_id[subnetConfigData[0]] }}"
+    network:
+      assign_public_ip: yes
     state: running
-  loop: "{{ cidr_instance_ordinal_pairs }}"
+  # loop: "{{ cidr_instance_ordinal_pairs }}"
+  loop: "{{ subnets | subnetsConfigToDict }}"
+  loop_control:
+    loop_var: subnetConfigData
   register: ec2InstancesCollection
 
+- name: Set instanceData Fact
+  ansible.builtin.set_fact:
+    instanceData: "{{ ec2InstancesCollection.results | json_query('[*].instances[].{id: instance_id, public_ip: network_interfaces[0].public_ip}') | list }}"
+    #json_query('[*].instance_ids[]')
 - name: Set IDs Fact
   ansible.builtin.set_fact:
-    "{{ runningInstanceIds }}": "{{ ec2InstancesCollection.results | json_query('[*].instance_id') | list }}"
+    "{{ varsGroup.runningInstanceIds }}": "{{ instanceData | json_query('[*].id') }}"
 
 - name: Pause for deployment
   ansible.builtin.pause:
@@ -58,18 +82,26 @@
 
 - name: Wait for SSH to come up
   debugger: on_failed
-  delegate_to: "{{ item.public_dns_name }}"
+  delegate_to: "{{ waitForInstance.public_ip }}"
   ansible.builtin.wait_for:
     timeout: 60
     port: 22
     state: started
-  loop: "{{ lookup('vars', runningInstanceIds) }}"
+  loop: "{{ instanceData }}" # "{{ lookup('vars', varsGroup.runningInstanceIds) }}"
+  loop_control:
+    loop_var: waitForInstance
 
 - name: write EC2 instance IDs to local variables file
   vars:
-    varname: "{{ runningInstanceIds }}"
-    varval: "{{ lookup('vars', runningInstanceIds) | to_yaml }}"
+    varname: "{{ varsGroup.runningInstanceIds }}"
+    varval: "{{ lookup('vars', varsGroup.runningInstanceIds) | to_yaml }}"
   ansible.builtin.include_tasks: ../playbook_write_local_vars_file.yml
+
+# TODO: store public dns's as groups (use multiple groups, dynamically named)
+
+
+
+
 # - name: Provision master/vm2 instance
 #   vars:
 #     name: "{{  'master_vm2' + item }}"

@@ -21,10 +21,19 @@ allow_allSG:
     proto: tcp
     description: all tcp egress
 
-security_groups:
-- "{{ allow_allSG }}"
-
-vpcCIDR: 10.10.0.0/16
 region: us-east-1
 key_name: Default_KeyPair
+
+vpcConfigs:
+  subscriber:
+    vpcCIDR: 10.10.0.0/16
+    vpcName: subscriber_vpc
+    securityGroups:
+    - "{{ allow_allSG | appendProperty('name', '-subscriber') }}"
+
+  publisher:
+    vpcCIDR: 10.20.0.0/16
+    vpcName: publisher_vpc
+    securityGroups:
+    - "{{ allow_allSG | appendProperty('name', '-publisher')}}"
 ...

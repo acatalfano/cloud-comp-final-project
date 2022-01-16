@@ -1,8 +1,15 @@
 ---
 # this is where we defined variable names
 # for what gets written to the local_vars.yml file
-runningInstanceIds: running_aws_ids
-subnetCidrs: subnet_CIDRs
-vpc: subscriber_vpc
-vpcId: 'my_vpc_id'
+subscribers:
+  subnetCidrs: subscriber_subnet_CIDRs
+  vpc: subscriber_vpc
+  vpcId: my_subscriber_vpc_id
+  runningInstanceIds: running_aws_subscriber_ids
+
+publishers:
+  vpcId: my_publisher_vpc_id
+  vpc: publisher_vpc
+  subnetCidrs: publisher_subnet_CIDRs
+  runningInstanceIds: running_aws_publisher_ids
 ...

@@ -14,47 +14,57 @@
 #   ansible.builtin.debug:
 #     msg: "{{ lookup('vars', subnetCidrs) }}"
 
-# - name: store in register ec2 group info
-#   amazon.aws.ec2_group_info:
-#     filters:
-#       vpc-id: "{{ lookup('vars', vpcId) }}"
-#   register: securityGroupInfo
-#
-# - name: Clean up security groups
-#   amazon.aws.ec2_group:
-#     group_id: "{{ item }}"
-#     state: absent
-#   loop: "{{ securityGroupInfo | json_query('security_groups[?group_name!=`default`].group_id') }}"
+# - name: debug varsGroup vars
+#   debug:
+#     msg: "{{ lookup('vars', item.value, default='not found') }}"
+#   loop: "{{ varsGroup | dict2items }}"
 
 - name: Clean up provisioned Cloud Instances
   vars:
-    ids: "{{ lookup('vars', runningInstanceIds, default=[]) }}"
+    instanceIds: "{{ lookup('vars', varsGroup.runningInstanceIds, default=[]) }}"
   amazon.aws.ec2_instance:
     region: "{{ region }}"
-    instance_ids: "{{ ids }}"
+    instance_ids: "{{ instanceIds }}"
     state: absent
+  when: instanceIds
+
+- name: store in register ec2 group info
+  vars:
+    vpcIdName: "{{ varsGroup.vpcId | default('') }}"
+  amazon.aws.ec2_group_info:
+    filters:
+      vpc-id: "{{ lookup('vars', vpcIdName) }}"
+  register: securityGroupInfo
+  when: vpcIdName
+
+- name: Clean up security groups
+  amazon.aws.ec2_group:
+    group_id: "{{ secGroupId }}"
+    state: absent
+  loop: "{{ securityGroupInfo | json_query('securityGroups[?group_name!=`default`].group_id') }}"
+  loop_control:
+    loop_var: secGroupId
+  when: securityGroupInfo and secGroupId
+  ignore_errors: yes
 
 - name: Clean up provisioned subnets
   vars:
-    myVpcId: "{{ vpcId | default('') }}"
+    myVpcId: "{{ varsGroup.vpcId | default('') }}"
   amazon.aws.ec2_vpc_subnet:
     vpc_id: "{{ myVpcId }}"
-    cidr: "{{ item }}"
+    cidr: "{{ subnetCIDR }}"
     state: absent
-  loop: "{{ query('vars', subnetCidrs) | default([]) }}"
-  when: "{{ myVpcId != '' }}"
+  loop: "{{ query('vars', varsGroup.subnetCidrs, default=[]) }}"
+  loop_control:
+    loop_var: subnetCIDR
+  when: myVpcId and subnetCIDR
 
 - name: Clean up provisioned vpc
   vars:
-    vpcName: "{{ vpc | default('') }}"
+    vpcName: "{{ varsGroup.vpc | default('') }}"
   amazon.aws.ec2_vpc_net:
     name: "{{ vpcName }}"
     state: absent
-    cidr_block: "{{ vpcCIDR }}"
-  when: "{{ vpcName != '' }}"
-
-- name: delete local VM variables file to signify success
-  ansible.builtin.file:
-    path: "{{ localVmVariables }}"
-    state: absent
+    cidr_block: "{{ config.vpcCIDR }}"
+  when: vpcName
 ...

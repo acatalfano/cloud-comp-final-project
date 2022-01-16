@@ -1,0 +1,36 @@
+---
+#
+# EECS 5287: Principles of Cloud Computing
+# Author: Adam Catalfano, Abhinav Jambulingam
+# Created: Fall 2021
+#
+# Create VPC on AWS
+#
+# REQUIRES:
+#     varsGroup - dict containing subnetCidrs, vpc, and vpcId variable names
+#     vpcConfig - dict with vpcCIDR, vpcName
+#
+
+- name: Create VPC
+  amazon.aws.ec2_vpc_net:
+    name: "{{ vpcConfig.vpcName }}"
+    cidr_block: "{{ vpcConfig.vpcCIDR }}"
+    region: "{{ region }}"
+  register: myVpc
+
+- name: Write VPC ID to local variables file
+  vars:
+    varname: "{{ varsGroup.vpcId }}"
+    varval: "{{ myVpc.vpc.id }}"
+  ansible.builtin.include_tasks: ../playbook_write_local_vars_file.yml
+
+- name: Set VPC ID as Fact
+  ansible.builtin.set_fact:
+    "{{ varsGroup.vpcId }}": "{{ myVpc.vpc.id }}"
+
+- name: Write VPC name to local variables file
+  vars:
+    varname: "{{ varsGroup.vpc }}"
+    varval: my_vpc
+  ansible.builtin.include_tasks: ../playbook_write_local_vars_file.yml
+...

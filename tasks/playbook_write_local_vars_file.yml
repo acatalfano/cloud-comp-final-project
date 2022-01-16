@@ -32,10 +32,4 @@
   ansible.builtin.lineinfile:
     path: "{{ localVmVariables }}"
     line: "{{ varname }}: {{ varval }}"
-
-# - name: Write EC2 ID's to Variables File as an array variable
-#   ansible.builtin.lineinfile:
-#     path: "{{ localVmVariables }}"
-#     line: "---\n{{ runningInstanceIds }}: {{ instance_ids }}\n..."
-#     create: yes
 ...

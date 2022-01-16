@@ -32,6 +32,19 @@
     register: localVarsStat
 
   - name: destroy AWS instances
+    vars:
+      varsGroup: "{{ item.varsGroup }}"
+      config: "{{ item.config }}"
     ansible.builtin.include_tasks: tasks/aws_instance_management/playbook_cleanup.yml
+    loop:
+    - varsGroup: "{{ subscribers }}"
+      config: "{{ vpcConfigs.subscriber }}"
+    - varsGroup: "{{ publishers }}"
+      config: "{{ vpcConfigs.publisher }}"
     when: localVarsStat.stat.exists
+
+  - name: delete local VM variables file to signify success
+    ansible.builtin.file:
+      path: "{{ localVmVariables }}"
+      state: absent
 ...

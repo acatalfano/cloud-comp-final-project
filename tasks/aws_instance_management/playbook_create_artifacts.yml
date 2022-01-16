@@ -1,0 +1,76 @@
+---
+#
+# EECS 5287: Principles of Cloud Computing
+# Author: Adam Catalfano, Abhinav Jambulingam
+# Created: Fall 2021
+#
+# Create All EC2 Artifacts for one vpc
+#   including:
+#       - vpc
+#       - internet gateway
+#       - routing table
+#       - subnets
+#       - security groups
+#       - instances (VMs)
+#
+#   Also writes relevant values to local variables file
+#
+# REQUIRES:
+#   varsGroup - dict with vpcId, subnetCidrs
+#   vpcConfig - dict with vpcCIDR, vpcName, securityGroups
+#   subnets - list of dicts w/ cidr, instances
+#   region - AWS region
+#
+- name: Build AWS EC2 VPC
+  # vars:
+  #   varsGroup: "{{ varsGroup }}"
+  #   vpcConfig: "{{  vpcConfig }}"
+  ansible.builtin.include_tasks: playbook_create_aws_vpc.yml
+  # loop:
+  # - varsGroup: "{{ subscribers }}"
+  #   vpcConfig: "{{ vpcConfigs.subscriber }}"
+  # - varsGroup: "{{ publishers }}"
+  #   vpcConfig: "{{ vpcConfigs.publisher }}"
+  # loop_control:
+  #   loop_var: vpcData
+
+- name: pause between vpc and subnets
+  ansible.builtin.pause:
+    seconds: 15
+
+- name: Build AWS EC2 Subnets
+  # vars:
+  #   varsGroup: "{{ varsGroup }}"
+  #   subnets: "{{ subnets }}"
+  ansible.builtin.include_tasks: playbook_create_subnets.yml
+  # loop: "{{ varsGroupsAndSubnets }}"
+  # loop_control:
+  #   loop_var: subnetsData
+
+- name: pause between subnets and security groups
+  ansible.builtin.pause:
+    seconds: 15
+
+- name: Build AWS EC2 Security Groups
+  vars:
+    vpcId: "{{ varsGroup.vpcId }}"
+    securityGroups: "{{ vpcConfig.securityGroups }}"
+  # TODO make this config'ble. with diff names for each vpc
+  ansible.builtin.include_tasks: playbook_create_security_groups.yml
+
+- name: Provision AWS EC2 instances
+  vars:
+    securityGroups: "{{ vpcConfig.securityGroups }}"
+  # vars:
+  #   varsGroup: "{{ varsGroup }}"
+  #   subnets: "{{ subnets }}"
+  ansible.builtin.include_tasks: playbook_create_aws_vms.yml
+  # # loop: "{{ varsGroupsAndSubnets }}"
+  # loop:
+  # # - varsGroup: "{{ subscribers }}"
+  # #   subnets: "{{ subscriberSubnets }}"
+  # - varsGroup: "{{ publishers }}"
+  #   subnets: "{{ publisherSubnets }}"
+  # loop_control:
+  #   loop_var: instanceData
+...

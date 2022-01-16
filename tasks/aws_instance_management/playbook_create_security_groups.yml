@@ -7,17 +7,19 @@
 # Create EC2 Security Groups
 #
 # REQUIRES:
-#   security_groups - a list of dict's, each with name and optionally in_rules and/or out_rules
+#   securityGroups - a list of dict's, each with name and optionally in_rules and/or out_rules
 #   vpcId - AWS VPC ID for EC2
 #   region - AWS region
 
 - name: create a security group
-  loop: "{{ security_groups }}"
+  loop: "{{ securityGroups }}"
+  loop_control:
+    loop_var: sg
   amazon.aws.ec2_group:
-    name: "{{ item.name }}"
-    description: "{{ item.description }}"
+    name: "{{ sg.name }}"
+    description: "{{ sg.description }}"
     vpc_id: "{{ lookup('vars', vpcId) }}"
     region: "{{ region }}"
-    rules: "{{ item.in_rules | default([]) | asSecGroupRules }}"
-    rules_egress: "{{ item.out_rules | default([]) | asSecGroupRules }}"
+    rules: "{{ sg.in_rules | default([]) | asSecGroupRules }}"
+    rules_egress: "{{ sg.out_rules | default([]) | asSecGroupRules }}"
 ...
